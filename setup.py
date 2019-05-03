@@ -28,7 +28,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pychm',
-        'BeautifulSoup',
+        'beautifulsoup4',
     ],
     entry_points={
         'console_scripts': ['archmage = archmod.cli:main'],

@@ -21,11 +21,19 @@
 
 import re
 import mimetypes
-import sgmllib, urllib2
+import urllib.request, urllib.error, urllib.parse
 
-from BeautifulSoup import BeautifulSoup
-from HTMLParser import HTMLParser, HTMLParseError
-from urlparse import urlparse
+from bs4 import BeautifulSoup
+from html.parser import HTMLParser
+try:
+    from html.parser import HTMLParseError
+except ImportError as e:
+    # HTMLParseError is removed in Python 3.5. Since it can never be
+    # thrown in 3.5, we can just define our own class as a placeholder.
+    class HTMLParseError(Exception):
+        pass
+
+from urllib.parse import urlparse
 
 from archmod import COMMASPACE, LF, CR
 
@@ -71,12 +79,12 @@ class TagStack(list):
         try:
             pos = self.index(tag)
         except ValueError:
-            raise HTMLParseError, 'Tag not on stack'
+            raise HTMLParseError('Tag not on stack')
         self[:] = self[pos + 1:]
         self.reverse()
 
 
-class SitemapParser(sgmllib.SGMLParser):
+class SitemapParser(HTMLParser):
     """Class for parsing files in SiteMap format, such as .hhc"""
 
     def __init__(self):
@@ -85,7 +93,7 @@ class SitemapParser(sgmllib.SGMLParser):
         self.name = self.local = self.param = ""
         self.imagenumber = 1
         self.parsed = ""
-        sgmllib.SGMLParser.__init__(self)
+        HTMLParser.__init__(self)
 
     def unknown_starttag(self, tag, attrs):
         # first ul, start processing from here
@@ -146,14 +154,14 @@ class SitemapParser(sgmllib.SGMLParser):
                 self.tagstack.pop(tag)
 
 
-class PageLister(sgmllib.SGMLParser):
+class PageLister(HTMLParser):
     """
     Parser of the chm.chm GetTopicsTree() method that retrieves the URL of the HTML
     page embedded in the CHM file.
     """
 
     def reset(self):
-        sgmllib.SGMLParser.reset(self)
+        HTMLParser.reset(self)
         self.pages = []
 
     def start_param(self, attrs):
@@ -163,20 +171,20 @@ class PageLister(sgmllib.SGMLParser):
                 urlparam_flag = True
             if urlparam_flag and key == 'value':
                 # Sometime url has incorrect slashes
-                value = urllib2.unquote(urlparse(value.replace('\\', '/')).geturl())
+                value = urllib.parse.unquote(urlparse(value.replace('\\', '/')).geturl())
                 value = '/' + re.sub("#.*$", '', value)
                 # Avoid duplicates
                 if not self.pages.count(value):
                     self.pages.append(value)
 
 
-class ImageCatcher(sgmllib.SGMLParser):
+class ImageCatcher(HTMLParser):
     """
     Finds image urls in the current html page, so to take them out from the chm file.
     """
 
     def reset(self):
-        sgmllib.SGMLParser.reset(self)
+        HTMLParser.reset(self)
         self.imgurls = []
 
     def start_img(self, attrs):
@@ -190,7 +198,7 @@ class ImageCatcher(sgmllib.SGMLParser):
         for key, value in attrs:
             if key.lower() == 'href':
                 url = urlparse(value)
-                value = urllib2.unquote(url.geturl())
+                value = urllib.parse.unquote(url.geturl())
                 # Remove unwanted crap
                 value = '/' + re.sub("#.*$", '', value)
                 # Check file's mimetype
